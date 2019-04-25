@@ -47,9 +47,94 @@ class Stock:
         plt.show()
 
 
+# class MySignal(bt.Indicator):
+#     lines = ('signal',)
+#     params = (('period', 30),)
+#
+#     def __init__(self):
+#         self.lines.signal = self.data - bt.indicators.SMA(period=self.p.period)
+#
+
+class ssa_index_ind(bt.Indicator):
+    lines = ('ssa',)
+
+    def __init__(self,ssa_window):
+        self.params.ssa_window = ssa_window
+
+        self.addminperiod(self.params.ssa_window * 2)
+
+    def get_window_matrix(self,input_array,t,m):
+
+        temp = []
+
+        n = t - m + 1
+
+        for i in range(1,n):
+            temp.append(input_array[i:i+m])
+
+        window_matrix = np.array(temp)
+
+        return window_matrix
+
+    def svd_reduce(self,window_matrix):
+
+        # svd 分解
+        u, s, v = np.linalg.svd(window_matrix)
+        m1,n1 = u.shape
+        m2,n2 = v.shape
+        index = s.argmax()
+
+        u1 = u[:,index]
+        v1 = v[index]
+        u1 = u1.reshape((m1,1))
+        v1 = v1.reshape((1,n2))
+
+        value = s.max()
+
+        new_matrix = value * (np.dot(u1,v1))
+
+        return new_matrix
+
+    def recreate_array(self,new_matrix,t,m):
+
+        ret = []
+        n = t - m + 1
+        for p in range(1,t+1):
+            if p < m:
+                alpha = p
+            elif p > t - m + 1:
+                alpha = t - p + 1
+            else:
+                alpha = m
+            sigma = 0
+
+            for j in range(1,m + 1):
+                i = p - j + 1
+                if i > 0 and i < n + 1:
+                    sigma += new_matrix[i - 1][j - 1]
+
+            ret.append(sigma/alpha)
+
+        return ret
+
+    def SSA(self,input_array,t,m):
+        window_matrix = self.get_window_matrix(input_array,t,m)
+        new_matrix = self.svd_reduce(window_matrix=window_matrix)
+        new_array = self.recreate_array(new_matrix,t,m)
+
+        return new_array
+
+    def next(self):
+
+        data_serial = self.data.get(size = self.params.ssa_window * 2)
+        self.lines.ssa[0] = self.SSA(data_serial,len(data_serial),int(len(data_serial)/2))[-1]
+
+
+
 class TestStrategy(bt.Strategy):
-    params = ((
-                  'mapperiod', 15
+    params = (
+        ('ssa_window',15),
+         ('mapperiod', 15
               ),)
 
     def log(self, txt, dt=None):
@@ -65,25 +150,28 @@ class TestStrategy(bt.Strategy):
         self.buyprice = None
         self.buycomm = None
 
+
+        self.ssa = ssa_index_ind(ssa_window=self.params.ssa_window,subplot = False)
+
         self.sma = bt.indicators.SimpleMovingAverage(
-            self.datas[0], period=self.p.mapperiod
+            self.datas[0], period=self.params.mapperiod
         )
 
-        def start(self):
+    def start(self):
             print("the world call me!")
 
-        def prenext(self):
+    def prenext(self):
 
             print("no mature")
 
-        def notify_order(self, order):
+    def notify_order(self, order):
             if order.status in [order.Submitted, order.Accepted]:
                 # Buy/Sell order submitted/accepted to/by broker - Nothing to do
                 return
 
             if order.status in [order.Completed]:
                 if order.isbuy():
-                    self.log("BUY EXECUTED %.2f" % (order.executed.price,
+                    self.log("BUY EXECUTED,Price %.2f,Cost %.2f,Comm %.2f" % (order.executed.price,
                                                     order.executed.value,
                                                     order.executed.comm))
                     self.buyprice = order.executed.price
@@ -91,7 +179,7 @@ class TestStrategy(bt.Strategy):
 
 
                 else:
-                    self.log("SELL EXCUTED %.2f" % (order.executed.price,
+                    self.log("SELL EXCUTED,Price %.2f,Cost %.2f,Comm %.2f" % (order.executed.price,
                                                     order.executed.value,
                                                     order.executed.comm))
 
@@ -105,67 +193,64 @@ class TestStrategy(bt.Strategy):
             # Check if an order has been completed
             # Attention: broker could reject order if not enougth cash
 
-        #            if order.status in [order.Completed]:
-        #                if order.isbuy():
-        #            #        self.log('BUY EXECUTED, %.2f' % order.executed.price)
-        #                    self.log('BUY EXECUTED, %.2f' % (
-        #                        order.executed.price,
-        #                        order.executed.value,
-        #                        order.executed.comm
-        #                    ))
-        #                    self.buyprice = order.executed.price
-        #                    self.buycom = order.executed.comm
-        #                    #self.log('SELL EXECUTED, %.2f' % order.executed.price)
-        #                    self.log('SELL EXECUTED, %.2f' %(
-        #                        order.executed.price,
-        #                        order.executed.value,
-        #                        order.exeucted.comm
-        #                    ))
-        #
-        #                self.bar_executed = len(self)
-        # elif order.status in [order.Canceled,order.Margin,order.Rejected]:
-        #
-        #
-        #    # Write down: no pending order
-        #            self.order = None
+    def notify_trade(self, trade):
+        if not trade.is_close():
 
-        def next(self):
+            return
 
-            # Simply log the closing price of the series from the reference
-            self.log('Close, %.2f' % self.dataclose[0])
+        self.log('OPERATION PROFIT GROSS %.2f NET  %.2f' %(trade.pnl,trade.pnlcomm))
 
-            # Check if an order is pending ... if yes, we cannot send a 2nd one
-            if self.order:
-                return
-
-            # Check if we are in the market
-            if not self.position:
-
-                # Not yet ... we MIGHT BUY if ...
-                if self.dataclose[0] < self.dataclose[-1]:
-                    # current close less than previous close
-
-                    if self.dataclose[-1] < self.dataclose[-2]:
-                        # previous close less than the previous close
-
-                        # BUY, BUY, BUY!!! (with default parameters)
-                        self.log('BUY CREATE, %.2f' % self.dataclose[0])
-
-                        # Keep track of the created order to avoid a 2nd order
-                        self.order = self.buy()
-
-            else:
-
-                # Already in the market ... we might sell
-                if len(self) >= (self.bar_executed + 5):
-                    # SELL, SELL, SELL!!! (with all possible default parameters)
-                    self.log('SELL CREATE, %.2f' % self.dataclose[0])
-
-                    # Keep track of the created order to avoid a 2nd order
-
+    # def next(self):
+    #
+    #     self.log('Close: %.2f' % self.dataclose[0])
+    #
+    #     if (self.dataclose[0] < self.dataclose[-1]):
+    #
+    #         if (self.dataclose[-1] < self.dataclose[-2]):
+    #
+    #
+    #             self.log('BUY CREATE %.2f' % self.dataclose[0])
+    #
+    #             self.buy()
     def next(self):
+
         # Simply log the closing price of the series from the reference
         self.log('Close, %.2f' % self.dataclose[0])
+
+        # Check if an order is pending ... if yes, we cannot send a 2nd one
+        if self.order:
+            return
+
+        # Check if we are in the market
+        if not self.position:
+
+            # Not yet ... we MIGHT BUY if ...
+            # if self.dataclose[0] < self.dataclose[-1]:
+                # current close less than previous close
+
+                # if self.dataclose[-1] < self.dataclose[-2]:
+                    # previous close less than the previous close
+
+                    # BUY, BUY, BUY!!! (with default parameters)
+            if self.dataclose[0] > self.ssa[0]:
+                self.log('BUY CREATE, %.2f' % self.dataclose[0])
+
+                # Keep track of the created order to avoid a 2nd order
+                self.order = self.buy()
+
+        else:
+
+            # Already in the market ... we might sell
+            # if len(self) >= (self.bar_executed + 5):
+                # SELL, SELL, SELL!!! (with all possible default parameters)
+            if self.dataclose[0] < self.ssa[0]:
+                self.log('SELL CREATE, %.2f' % self.dataclose[0])
+                self.order = self.sell()
+                # Keep track of the created order to avoid a 2nd order
+
+    def stop(self):
+        print("Death")
+
 
 
 if __name__ == '__main__':
@@ -177,19 +262,32 @@ if __name__ == '__main__':
     cerebro.addstrategy(TestStrategy)
 
     data_000905 = pd.read_csv('000905.csv', index_col=0, parse_dates=True)
+    print(data_000905)
 
+    # 选择1-5列
+    data_000905 = data_000905.iloc[:,1:5].copy()
     data_000905['openinterest'] = 0
+
+    print(data_000905)
 
     data = bt.feeds.PandasData(dataname=data_000905,
                                fromdate=datetime.datetime(2011, 1, 1), todate=datetime.datetime(2019, 2, 11))
 
+    print(data)
+
     cerebro.adddata(data)
+
+
 
     cerebro.broker.setcash(100.00)
 
     cerebro.broker.setcommission(commission=0.0)
 
-    cerebro.addsizer(bt.sizers.FixedSize, staker=10)
+    cerebro.addsizer(bt.sizers.FixedSize,stake = 10)
+
+
+    #cerebro.addsizer(bt.sizers.FixedSize,staker = 10 )
+    # staker 没有这个参数
     # cerebro settting
 
     cerebro.run()
