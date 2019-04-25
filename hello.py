@@ -69,7 +69,7 @@ class ssa_index_ind(bt.Indicator):
 
         n = t - m + 1
 
-        for i in range(1,n):
+        for i in range(n):
             temp.append(input_array[i:i+m])
 
         window_matrix = np.array(temp)
@@ -127,7 +127,7 @@ class ssa_index_ind(bt.Indicator):
     def next(self):
 
         data_serial = self.data.get(size = self.params.ssa_window * 2)
-        self.lines.ssa[0] = self.SSA(data_serial,len(data_serial),int(len(data_serial)/2))[-1]
+        self.lines.ssa[0] = self.SSA(data_serial,len(data_serial),int(len(data_serial)/ 2))[-1]
 
 
 
@@ -194,7 +194,7 @@ class TestStrategy(bt.Strategy):
             # Attention: broker could reject order if not enougth cash
 
     def notify_trade(self, trade):
-        if not trade.is_close():
+        if not trade.is_closed:
 
             return
 
@@ -253,6 +253,15 @@ class TestStrategy(bt.Strategy):
 
 
 
+
+def data_stock_get(stock_id,stock_end_date,stock_start_date='2011-1-1'):
+
+    auth('18380152997','2wsx3edc')
+
+    stock_Adata = Stock(stock_id=stock_id,stock_end_date=stock_end_date,stock_start_date=stock_start_date)
+
+    return stock_Adata.stock_data
+
 if __name__ == '__main__':
     # auth('18380152997','2wsx3edc')
     # finance_balance_sheet()
@@ -261,25 +270,21 @@ if __name__ == '__main__':
 
     cerebro.addstrategy(TestStrategy)
 
-    data_000905 = pd.read_csv('000905.csv', index_col=0, parse_dates=True)
-    print(data_000905)
+    # data_000905 = pd.read_csv('000905.csv', index_col=0, parse_dates=True)
+    # print(data_000905)
 
-    # 选择1-5列
-    data_000905 = data_000905.iloc[:,1:5].copy()
-    data_000905['openinterest'] = 0
-
-    print(data_000905)
-
-    data = bt.feeds.PandasData(dataname=data_000905,
-                               fromdate=datetime.datetime(2011, 1, 1), todate=datetime.datetime(2019, 2, 11))
-
-    print(data)
-
+    dataframe = pd.read_csv('0009051.csv', index_col=0, parse_dates=True)
+    dataframe['openinterest'] = 0
+    data = bt.feeds.PandasData(dataname=dataframe,
+                               fromdate = datetime.datetime(2011, 1, 1),
+                               todate = datetime.datetime(2019, 12, 31))
+    # Add the Data Feed to Cerebro
     cerebro.adddata(data)
 
 
 
-    cerebro.broker.setcash(100.00)
+
+    cerebro.broker.setcash(100000000.00)
 
     cerebro.broker.setcommission(commission=0.0)
 
