@@ -4,6 +4,7 @@ import pandas as pd
 import backtrader as bt
 import datetime
 import backtrader.indicators as btind
+import argparse
 #
 #class max_index_ind(bt.Indicator):
 #
@@ -51,8 +52,9 @@ class mystrategy(bt.Strategy):
 
     params=(('exitbars',5),
             ('stake',100),
-            ('mapperiod',38),
+            ('mapperiod',40),
             ('devfactor',2.0),
+            ('tail',False),
     )
     def log(self,txt,dt = None):
         '''Logging function for this strategy'''
@@ -68,7 +70,7 @@ class mystrategy(bt.Strategy):
         self.order = None
 
         #self.macd = bt.indicators.MACD(self.datas[0])
-        self.sma = btind.SMA(self.datas[0])
+        self.sma = btind.SMA(self.datas[0],subplot=False)
         self.bbrands = btind.BBands(self.datas[0],period = self.params.mapperiod,devfactor = self.params.devfactor)
         self.atr = btind.ATR(self.datas[0],plot = False)
 
@@ -101,6 +103,8 @@ class mystrategy(bt.Strategy):
                 self.buycomm = order.executed.comm
 
                 # set sizer
+
+
 
             else:
                 #self.log("Sell executed %.2f" % order.executed.price)
@@ -165,21 +169,50 @@ def add_data():
 
     return dataframe
 
+def parser_args():
+    """parse args used to get command line args"""
+    parser = argparse.ArgumentParser(description='ATR')
+
+    parser.add_argument('--fromdate','-f',default='2011-01-01',help="Start date in YYYY-MM-DD format")
+
+    parser.add_argument('--todate','-t',default='2018-12-31',help="end date in YYYY-MM-DD format")
+
+    parser.add_argument('--cash',default='10000',type=int,help='starting cash')
+
+    parser.add_argument('--comm',default='0.0012',type=float,help='Commission for operation')
+
+    parser.add_argument('--stake',default=1,type=int,help="Stake to apply in each operation")
+
+    return parser.parse_args()
 
 
-if __name__ == "__main__":
+
+
+
+
+def runstrategy():
+    """run strategy is use to run strategy"""
+
+    args = parser_args()
+
+
+    fromdate = datetime.datetime.strptime(args.fromdate,"%Y-%m-%d")
+    todate = datetime.datetime.strptime(args.todate,"%Y-%m-%d")
+
+
+
 
     cerebro = bt.Cerebro()
 
-    cerebro.broker.setcash(10000.00)
+    cerebro.broker.setcash(args.cash)
 
 
-    data = bt.feeds.PandasData(dataname = add_data(),fromdate = datetime.datetime(2018,1,1),todate=datetime.datetime(2019,4,15))
+    data = bt.feeds.PandasData(dataname = add_data(),fromdate = fromdate,todate=todate)
 
 
     cerebro.adddata(data)
     cerebro.addstrategy(mystrategy)
-    cerebro.broker.setcommission(commission = 0.0012)
+    cerebro.broker.setcommission(commission = args.comm)
 
 
     print("Start Protfolio Value:%.2f" %cerebro.broker.getvalue())
@@ -187,3 +220,8 @@ if __name__ == "__main__":
 
     print("Final Protfolio Value:%.2f" % cerebro.broker.getvalue())
     cerebro.plot()
+
+
+
+if __name__ == "__main__":
+    runstrategy()
