@@ -51,7 +51,8 @@ class mystrategy(bt.Strategy):
 
     params=(('exitbars',5),
             ('stake',100),
-            ('mapperiod',20)
+            ('mapperiod',38),
+            ('devfactor',2.0),
     )
     def log(self,txt,dt = None):
         '''Logging function for this strategy'''
@@ -67,8 +68,14 @@ class mystrategy(bt.Strategy):
         self.order = None
 
         #self.macd = bt.indicators.MACD(self.datas[0])
+        self.sma = btind.SMA(self.datas[0])
+        self.bbrands = btind.BBands(self.datas[0],period = self.params.mapperiod,devfactor = self.params.devfactor)
+        self.atr = btind.ATR(self.datas[0],plot = False)
 
 
+        self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
+
+        self.signallow = btind.CrossOver(self.dataclose,self.bbrands.bot,plot = False)
 
 
 
@@ -122,14 +129,26 @@ class mystrategy(bt.Strategy):
         if self.order:
             return
         if not self.position:
-            if self.dataclose[0] <= self.dataclose[-1]:
-                self.log('Buy create %.2f' %self.dataclose[0])
-                self.order = self.buy()
-        else:
-            if self.dataclose[-1] > self.dataclose[0]:
-                self.log("sell create %.2f" %self.dataclose[0])
-                self.order = self.sell()
+            if self.signaltop > 0.0:
+                self.log('Buy Create %.2f' % self.dataclose[0])
+                self.order = self.buy(size = 100)
 
+
+        else:
+
+            if (self.signallow < 0.0) or (self.dataclose[0] < self.sma[0]):
+                self.log('Sell create %.2f' %self.dataclose[0])
+
+                self.order = self.sell(size = 100)
+#        if not self.position:
+#            if self.dataclose[0] <= self.dataclose[-1]:
+#                self.log('Buy create %.2f' %self.dataclose[0])
+#                self.order = self.buy()
+#        else:
+#            if self.dataclose[-1] > self.dataclose[0]:
+#                self.log("sell create %.2f" %self.dataclose[0])
+#                self.order = self.sell()
+#
 
 
 
@@ -152,10 +171,10 @@ if __name__ == "__main__":
 
     cerebro = bt.Cerebro()
 
-    cerebro.broker.setcash(1000000.00)
+    cerebro.broker.setcash(10000.00)
 
 
-    data = bt.feeds.PandasData(dataname = add_data(),fromdate = datetime.datetime(2017,1,1),todate=datetime.datetime(2019,4,15))
+    data = bt.feeds.PandasData(dataname = add_data(),fromdate = datetime.datetime(2018,1,1),todate=datetime.datetime(2019,4,15))
 
 
     cerebro.adddata(data)
