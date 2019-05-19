@@ -262,6 +262,7 @@ def data_stock_get(stock_id,stock_end_date,stock_start_date='2011-1-1'):
 
     return stock_Adata.stock_data
 
+
 if __name__ == '__main__':
     # auth('18380152997','2wsx3edc')
     # finance_balance_sheet()
