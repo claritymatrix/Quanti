@@ -72,7 +72,7 @@ class mystrategy(bt.Strategy):
         #self.macd = bt.indicators.MACD(self.datas[0])
         self.sma = btind.SMA(self.datas[0],subplot=False)
         self.bbrands = btind.BBands(self.datas[0],period = self.params.mapperiod,devfactor = self.params.devfactor)
-        self.atr = btind.ATR(self.datas[0],plot = False)
+        self.atr = btind.ATR(self.datas[0])
 
 
         self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
@@ -138,7 +138,7 @@ class mystrategy(bt.Strategy):
                 self.order = self.buy(size = 100)
 
 
-        else:
+
 
             if (self.signallow < 0.0) or (self.dataclose[0] < self.sma[0]):
                 self.log('Sell create %.2f' %self.dataclose[0])
