@@ -5,7 +5,9 @@ import backtrader as bt
 import datetime
 import backtrader.indicators as btind
 import argparse
+import math
 #
+
 #class max_index_ind(bt.Indicator):
 #
 #    lines = ('maxwindow',)
@@ -28,6 +30,21 @@ import argparse
 #
 #        return new_array
 
+class max_window_ind(bt.Indicator):
+
+    params = dict(maxwindow=20,)
+
+    def __init__(self,maxwindow):
+        self.params.maxwindow = maxwindow
+
+        self.adminperiod(self.params.maxwindow * 2)
+
+    def getmotive(self,x,y):
+
+        return (y - x) / x
+
+
+
 
 
 #class max_index_ind(bt_Indicator):
@@ -48,13 +65,15 @@ import argparse
 #
  #   def next(self):
   #      self.lines.maxwindow[0] = self.MAXWINDOW(self.datas[0])
+
 class mystrategy(bt.Strategy):
 
     params=(('exitbars',5),
-            ('stake',100),
-            ('mapperiod',40),
-            ('devfactor',2.0),
-            ('tail',False),
+            ('mapperiod',5),
+            ('mapperiod02',20),
+            ('sellflag',0),
+            ('buyflag',0),
+            ('ownprice',0),
     )
     def log(self,txt,dt = None):
         '''Logging function for this strategy'''
@@ -70,14 +89,23 @@ class mystrategy(bt.Strategy):
         self.order = None
 
         #self.macd = bt.indicators.MACD(self.datas[0])
-        self.sma = btind.SMA(self.datas[0],subplot=False)
-        self.bbrands = btind.BBands(self.datas[0],period = self.params.mapperiod,devfactor = self.params.devfactor)
+        self.sma05 = btind.SMA(self.datas[0],period = self.params.mapperiod,subplot=False)
+        self.sma20 = btind.SMA(self.datas[0],period = self.params.mapperiod02,subplot = False)
+        self.bbrands = btind.BBands(self.datas[0],plot = False)
+        self.max20 = bt.talib.MAX(self.datas[0],period = self.params.mapperiod02,plot = False)
+
+        self.min20 = bt.talib.MIN(self.datas[0],period = self.params.mapperiod02,plot = False)
         self.atr = btind.ATR(self.datas[0])
 
+        self.stake = 800
 
-        self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
 
-        self.signallow = btind.CrossOver(self.dataclose,self.bbrands.bot,plot = False)
+        ## self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
+
+        self.signalcrossover = btind.CrossOver(self.dataclose,self.sma20,plot = False)
+        self.signallow = btind.CrossOver(self.datas[0],self.bbrands.bot)
+        self.signaltop = btind.CrossOver(self.datas[0],self.bbrands.top)
+
 
 
 
@@ -101,7 +129,6 @@ class mystrategy(bt.Strategy):
 
                 self.buyprice = order.executed.price
                 self.buycomm = order.executed.comm
-
                 # set sizer
 
 
@@ -127,23 +154,58 @@ class mystrategy(bt.Strategy):
 
     def next(self):
 
+        sizer = self.stake
         self.log('Close %.2f' % self.dataclose[0])
+
+
 
 
         if self.order:
             return
+
+        #print("buyflag is %.2f,sellfalg is %.2f" %(self.params.buyflag,self.params.sellflag))
+        #if (self.signalcrossover > 0.0) and (self.params.buyflag == 0): #
+        #    self.params.buyflag = 1
+
+        #    if (self.signaltop > 0.0) and (self.params.sellflag == 0):
+#
+        #        self.params.sellflag = 1
+
+
         if not self.position:
-            if self.signaltop > 0.0:
-                self.log('Buy Create %.2f' % self.dataclose[0])
-                self.order = self.buy(size = 100)
+
+            #if  (self.signallow > 0.0) and (self.params.buyflag == 1):
+
+            if (self.dataclose[0] < self.min20[-1]) and(self.signallow < 0.0):
+
+                #self.params.buyflag = 0
+                #self.sellflag = 0
+
+                sizer = np.where(self.stake > 0,800,0)
+
+                self.order = self.buy(size = sizer)
+
+                self.log('Buy Create %.2f %.2f,ATR is %.2f' %(self.dataclose[0],sizer,sizer * self.atr[-1]))
+                self.stake = self.stake - sizer
+                self.params.ownprice = np.where(self.params.ownprice < self.dataclose[0],self.params.ownprice,self.dataclose[0])
 
 
 
 
-            if (self.signallow < 0.0) or (self.dataclose[0] < self.sma[0]):
-                self.log('Sell create %.2f' %self.dataclose[0])
+        else:
+            #print('the crossover signal is %.2f' % self.signalcrossover[0])
+            #if  (self.signalcrossover <  0.0) and (self.params.sellflag == 1) and (self.params.ownprice < self.dataclose[0]):
 
-                self.order = self.sell(size = 100)
+            if (self.dataclose[0] > self.max20[-1]) and (self.signaltop > 0.0) and (self.dataclose[0] > self.params.ownprice):
+                #self.params.sellflag = 0
+                print("the params stake is %.2f"  %self.stake)
+                sizer = np.where(self.stake == 0,800,0)
+
+                self.log('Sell Create %.2f %.2f' %(self.dataclose[0],sizer))
+                self.order = self.sell(size = sizer)
+
+                self.stake = self.stake + sizer
+
 #        if not self.position:
 #            if self.dataclose[0] <= self.dataclose[-1]:
 #                self.log('Buy create %.2f' %self.dataclose[0])
@@ -153,8 +215,6 @@ class mystrategy(bt.Strategy):
 #                self.log("sell create %.2f" %self.dataclose[0])
 #                self.order = self.sell()
 #
-
-
 
 
 
@@ -177,7 +237,7 @@ def parser_args():
 
     parser.add_argument('--todate','-t',default='2018-12-31',help="end date in YYYY-MM-DD format")
 
-    parser.add_argument('--cash',default='10000',type=int,help='starting cash')
+    parser.add_argument('--cash',default='100000',type=int,help='starting cash')
 
     parser.add_argument('--comm',default='0.0012',type=float,help='Commission for operation')
 
