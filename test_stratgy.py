@@ -6,29 +6,7 @@ import datetime
 import backtrader.indicators as btind
 import argparse
 import math
-#
-
-#class max_index_ind(bt.Indicator):
-#
-#    lines = ('maxwindow',)
-#    def __init__(self,max_window):
-#
-#        self.params.max_window = max_window
-#
-#        self.adminperiod(self.params.max_window * 2)
-#
-#    def getmotivate(self,t,y):
-#
-#        return (y - t)/t
-#
-#    def getstockprice(self,input_array):
-#        return input_array
-#
-#
-#
-#    def MAXWINDOW(self,input_array_01,input_array_02,input_array_03):
-#
-#        return new_array
+import queue
 
 class max_window_ind(bt.Indicator):
 
@@ -43,33 +21,33 @@ class max_window_ind(bt.Indicator):
 
         return (y - x) / x
 
+class cash():
+
+
+    def __init__(self,cash,stake = 10):
+
+
+        self.cash = cash
+        self.one_cash = cash / stake
+        self.top = stake
+        self.trade_queue = queue.Queue(stake)
+
+
+    def empty():
+
+        return self.trade_queue.empty()
 
 
 
+    def full():
+        return self.trade_queue.full()
 
-#class max_index_ind(bt_Indicator):
-#    lines = ('maxwindow',)
-#
-#
- #   def __init__(self,max_window):
-  #      self.params.max_window = max_window
-#
- #       self.adminperiod(self.params.max_window * 2)
-#
- #   def getmotivate(self,t,y):
-  #      return (y - t) / t
-#
- #   def MAXWINDOW(self,input_array):
-  #      getmotivate(input_array[-20],input_array[0])
-#
-#
- #   def next(self):
-  #      self.lines.maxwindow[0] = self.MAXWINDOW(self.datas[0])
+
 
 class mystrategy(bt.Strategy):
 
     params=(('exitbars',5),
-            ('mapperiod',5),
+            ('mapperiod',180),
             ('mapperiod02',20),
             ('sellflag',0),
             ('buyflag',0),
@@ -88,19 +66,20 @@ class mystrategy(bt.Strategy):
         self.dataclose = self.datas[0].close
         self.order = None
 
+
         #self.macd = bt.indicators.MACD(self.datas[0])
-        self.sma05 = btind.SMA(self.datas[0],period = self.params.mapperiod,subplot=False)
+        #self.sma05 = btind.SMA(self.datas[0],period = self.params.mapperiod,subplot=False)
         self.sma20 = btind.SMA(self.datas[0],period = self.params.mapperiod02,subplot = False)
-        self.bbrands = btind.BBands(self.datas[0],plot = False)
+        self.bbrands = btind.BBands(self.datas[0],subplot = False)
         self.max20 = bt.talib.MAX(self.datas[0],period = self.params.mapperiod02,plot = False)
 
         self.min20 = bt.talib.MIN(self.datas[0],period = self.params.mapperiod02,plot = False)
-        self.atr = btind.ATR(self.datas[0])
-
-        self.stake = 800
+        self.atr = btind.ATR(self.datas[0],plot = False)
 
 
-        ## self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
+
+
+        self.signaltop = btind.CrossOver(self.dataclose,self.bbrands.top,plot=False)
 
         self.signalcrossover = btind.CrossOver(self.dataclose,self.sma20,plot = False)
         self.signallow = btind.CrossOver(self.datas[0],self.bbrands.bot)
@@ -139,6 +118,8 @@ class mystrategy(bt.Strategy):
                                                                             order.executed.value,
                                                                             order.executed.comm))
 
+                #self.params.ownprice = order.executed.value
+
 
             self.bar_executed = len(self)
 
@@ -154,7 +135,7 @@ class mystrategy(bt.Strategy):
 
     def next(self):
 
-        sizer = self.stake
+
         self.log('Close %.2f' % self.dataclose[0])
 
 
@@ -176,51 +157,35 @@ class mystrategy(bt.Strategy):
 
             #if  (self.signallow > 0.0) and (self.params.buyflag == 1):
 
-            if (self.dataclose[0] < self.min20[-1]) and(self.signallow < 0.0):
+            if (self.signallow < 0.0):
 
                 #self.params.buyflag = 0
                 #self.sellflag = 0
 
-                sizer = np.where(self.stake > 0,800,0)
-
-                self.order = self.buy(size = sizer)
-
-                self.log('Buy Create %.2f %.2f,ATR is %.2f' %(self.dataclose[0],sizer,sizer * self.atr[-1]))
-                self.stake = self.stake - sizer
-                self.params.ownprice = np.where(self.params.ownprice < self.dataclose[0],self.params.ownprice,self.dataclose[0])
 
 
+                self.order = self.buy(size = 6000)
+
+                self.log('Buy Create %.2f ' %(self.dataclose[0]))
 
 
         else:
             #print('the crossover signal is %.2f' % self.signalcrossover[0])
             #if  (self.signalcrossover <  0.0) and (self.params.sellflag == 1) and (self.params.ownprice < self.dataclose[0]):
 
-            if (self.dataclose[0] > self.max20[-1]) and (self.signaltop > 0.0) and (self.dataclose[0] > self.params.ownprice):
+            if   (self.signaltop > 0.0)and (self.dataclose[0] > self.params.ownprice):
                 #self.params.sellflag = 0
-                print("the params stake is %.2f"  %self.stake)
-                sizer = np.where(self.stake == 0,800,0)
-
-                self.log('Sell Create %.2f %.2f' %(self.dataclose[0],sizer))
-                self.order = self.sell(size = sizer)
-
-                self.stake = self.stake + sizer
-
-#        if not self.position:
-#            if self.dataclose[0] <= self.dataclose[-1]:
-#                self.log('Buy create %.2f' %self.dataclose[0])
-#                self.order = self.buy()
-#        else:
-#            if self.dataclose[-1] > self.dataclose[0]:
-#                self.log("sell create %.2f" %self.dataclose[0])
-#                self.order = self.sell()
-#
+                self.log('Sell Create %.2f ' %(self.dataclose[0]))
+                self.order = self.sell(size = 6000)
 
 
 
-def add_data():
 
-    dataframe = pd.read_csv('000651.csv',index_col = 0,parse_dates = True)
+
+
+def add_data(filename = '002475.csv'):
+
+    dataframe = pd.read_csv(filename,index_col = 0,parse_dates = True)
 
     dataframe['openinterest'] = 0
 
@@ -233,15 +198,18 @@ def parser_args():
     """parse args used to get command line args"""
     parser = argparse.ArgumentParser(description='ATR')
 
+
+    parser.add_argument('--stockid','-s',default='002475.csv',help="input the stock file name like 000651.csv")
+
     parser.add_argument('--fromdate','-f',default='2011-01-01',help="Start date in YYYY-MM-DD format")
 
-    parser.add_argument('--todate','-t',default='2018-12-31',help="end date in YYYY-MM-DD format")
+    parser.add_argument('--todate','-t',default='2020-1-18',help="end date in YYYY-MM-DD format")
 
-    parser.add_argument('--cash',default='100000',type=int,help='starting cash')
+    parser.add_argument('--cash',default='18000000',type=int,help='starting cash')
 
     parser.add_argument('--comm',default='0.0012',type=float,help='Commission for operation')
 
-    parser.add_argument('--stake',default=1,type=int,help="Stake to apply in each operation")
+    parser.add_argument('--stake',default=3,type=int,help="Stake to apply in each operation")
 
     return parser.parse_args()
 
@@ -267,7 +235,7 @@ def runstrategy():
     cerebro.broker.setcash(args.cash)
 
 
-    data = bt.feeds.PandasData(dataname = add_data(),fromdate = fromdate,todate=todate)
+    data = bt.feeds.PandasData(dataname = add_data(args.stockid),fromdate = fromdate,todate=todate)
 
 
     cerebro.adddata(data)
