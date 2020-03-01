@@ -1,0 +1,430 @@
+(define (even? n) (= (remainder n 2) 0))
+
+(define (divides? a b) (= (remainder b a) 0))
+
+(define (prime? n) (= n (smallest-divisor n)))
+(define (smallest-divisor n) (find-divisor n 2))
+(define (find-divisor n test-divisor) (cond ((> (square test-divisor) n) n) ((divides? test-divisor n) test-divisor) (else (find-divisor n (+ test-divisor 1)))))
+(define (divides? a b) (= (remainder b a) 0))
+(define (square x) (* x x))
+(define (search-for-prime n max-count) (cond ((> n max-count) false) ((even? n) (search-for-prime (+ n 1) max-count)) ((prime? n) n) (else (search-for-prime (+ n 2) max-count))))
+
+(define (timed-prime-test n) (newline) (display n) (start-prime-test n (runtime)) )
+(define (start-prime-test n start-time) (if (prime? n) (report-time (- (runtime) start-time))))
+
+(define (report-time elapsed-time) (display "***") (display elapsed-time))
+(define (sum term a next b) (if (> a b) 0 (+ (term a) (sum term (next a) next b))))
+(define (sum term a next b) (define (iter a result) if (> a b) 0 (iter (next a) (+ result (term a)))))
+(define (inc x) (+ x 1))
+(define (sum term a next b) (define (iter a result) (if (> a b) result (iter (next a) (+ result (term a))))) (iter a 0))
+(define (add-dx a dx) ())
+(define (sum-term f a next b max-count) (+ f(a) f(b) (sum f (add-dx a) add-dx b) (sum f (add-dx a) add-dx b)))
+(define (sum term a next b) (if (not (< a b)) 0 (+ (term a) (sum term (next a) next b))))
+;(define (integers f a next b max-count) (define (math-dx) (/ (- b a) max-count))(* (+ (integer-singal f (+ a (math-dx)) next (+ b (* 2 (math-dx)))) (f a) (f b)) (/ (math-dx 3))))
+;(define (integral f a b dx) (define (add-dx x) (+ x dx)) (* (sum f (add-dx a) add-dx b) dx))
+
+;(define (integral-simpton f a b max-count)
+
+ ; (define (math-dx)(* 2 (/ (- b a) max-count)))
+
+  ;(* (+ f(a) f(b)
+   ;     (integral f (+ a (/ (math-dx) 2)) b (math-dx))
+                                        ;    (integral f (+ a (math-dx)) b (math-dx))) (/ (math-dx) 6)))
+(define (integral-simpton f a b dx) (define (add-dx x) (+ x dx dx)) (* (sum f (add-dx a) add-dx b) (/ dx 3)))
+
+
+(define (integral-simpton-sum f a b max-count)
+  (define (math-dx) (/ (- b a) max-count))
+  (+ (* (f a) (/ (math-dx) 3))
+     (* (f b) (/ (math-dx) 3))
+     (* (integral-simpton f (+ a (math-dx)) b (math-dx)) 4)
+     (* (integral-simpton f (+ a (* (math-dx) 2)) b (math-dx)) 2)
+     )
+)
+
+(define (squre x) (* x x))
+(define (f x) (/ (* (* 2 x) (+ (* 2 x) 2)) (square (+ (* 2 x) 1))))
+(define (product term a next b) (if (> a b) 1 (* (term a) (product term (next a) next b))))
+
+(define (product term a next b) (define (iter a result) (if (> a b) result (iter (next a) (* result (term a))))) (iter a 1))
+
+(define (accumulate combiner null-value term a next b) (define (iter a result) (if (> a b) result (iter (next a) (combiner result (term a))))) (iter a null-value))
+
+
+(define (accumulate-filled combiner filter null-value term a next b)(define (iter a result) (if (> a b) result (iter (next a) (combiner result (* (filter a) (term a)))))) (iter a null-value))
+
+
+(define (accumulate-filter combiner filter null-value term a next b) (define (iter a result) (if (> a b) result (iter (next a) (combiner result (* (filter a) (term a)))))) (iter a null-value))
+
+(define (f x y)
+  (define (f-helper a b)
+    (+ (* x (square a))
+       (* y b)
+       (* a b)))
+  (f-helper (+ 1 (* x y))
+            (- 1 y))
+  )
+
+
+(define (f x y)
+  (lambda (a b)
+    (+ (* x (square a))
+       (* y b)
+       (* a b)))
+  (+ 1 (* x y))
+  (- 1 y))
+(define (f x y)
+  (let ((a (+ 1 (* x y)))
+        (b (- 1 y)))
+  (+ (* x (square a))
+     (* y b)
+     (* a b))))
+
+
+(define (search f neg-point pos-point)
+  (let ((mid-point (average neg-point pos-point)))
+    (if (close-enough? neg-point pos-point)
+        mid-point
+        (let ((test-value (f mid-point)))
+          (cond ((positive? test-value) (search f neg-point mid-point))
+                ((negtive? test-value)  (search f mid-point pos-point))
+                (else mid-point))))))
+(define (close-enough? x y) (< (abs (- x y)) 0.0001))
+
+(define (half-interval-method f a b)
+  (let ((a-value (f a))
+        (b-value (f b)))
+    (cond ((and (negtive? a-value) (positive? b-value)) (search f a b))
+          ((and (negtive? b-value) (positive? a-value)) (search f b a))
+          (else (error "Values are not of opposite sign" a b)))))
+
+(define (average a b) (/ (+ a b) 2))
+(define (postive? x) (> x 0))
+(define (negtive? x) (< x 0))
+
+(define tolerance 0.0001)
+
+(define (fix-point f first-guess)
+  (define (close-enough? x y)
+    (< (abs (- x y)) tolerance))
+  (define (try guess)
+    (let ((next (f guess)))
+      (if (close-enough? guess next) next
+          (try next))))
+
+  (try first-guess)
+  )
+(define (sqrt x)
+  (fix-point (lambda (y) (average y (/ x y))) 1.0))
+
+(define (cont-frac n d k)
+  (define (cf result t)
+    (if ((= t k) result)
+        (cf (/ (n t) (+ (d t) result)) (+ t 1))))
+  (cf (/ (n k) (d k)) 1))
+
+
+(define (cont-frac-iteration N D k)
+  (define (cf result t)
+    (if (= t k)
+    result
+    (cf (/ (N t) (+ (D t) result));/
+        (+ t 1));cf
+    );if
+    );cf
+  (cf (/(N k) (D k)) 1)
+  );cont-frac-iteration
+(define (average-damp f)
+  (lambda (x) (average x (f x))))
+
+
+(define (deriv g)
+  (lambda (x) (/ (- (g (+ x dx)) (g x)) dx)))
+
+
+(define (add-rat x y)
+  (make-rat (+ (* (numer x) (demon y))
+               (* (numer y) (demon x)))
+            (* (demon x) (demon y))))
+
+(define (sub-rat x y)
+  (make-rat (- (* (numer x) (demon y))
+               (* (demon y) (numer x)))
+            (* (demon x) (demon y))))
+(define (mul-rat x y)
+  (make-rat (* (numer x) (numer y))
+            (* (demon x) (demon y))))
+
+(define (div-rat x y)
+  (make-rat (* (numer x) (demon y))
+            (* (demon x) (numer y))))
+
+(define (equal-rat? x y)
+  (= (* (numer x) (demon y))
+     (* (demon x) (numer y))))
+
+(define (make-rat n d) (cons n d))
+
+(define (numer x) (car x))
+(define (demon x) (cdr x))
+
+
+(define (make-rat n d)
+  (let ((g (gcd n d)))
+    (cons (/ n g) (/ d g))))
+
+(define (gcd n d)
+  (if (= d 0)
+      n
+      (gcd d (remainder n d))))
+(define (cons-test x y)
+  (define (dispatch m)
+    (cond ((= m 0) x)
+          ((= m 1) y)
+          (else (error "Argument not 0 or 1 --CONS" m))))
+  dispatch)
+
+
+(define (time x a)
+  (cond ((= a 1) a)
+        ((even? a) (* x (time x (- a 1))))
+        (else (square (time  x (/ a 2))))))
+
+(define (time x a result)
+  (cond ((= a 0) 1)
+        ((even? a) (time x (- a 1) (* x result)))
+        (else (time ))))
+
+
+(define (add-interval x y)
+  (make-interval (+ (lower-bound x) (lower-bound y))
+                 (+ (upper-bound x) (upper-bound y))))
+
+(define (mul-interval x y)
+  (let ((p1 (* (lower-bound x) (lower-bound y)))
+        (p2 (* (lower-bound x) (upper-bound y)))
+        (p3 (* (upper-bound x) (lower-bound y)))
+        (p4 (* (upper-bound x) (upper-bound y))))
+    (make-interval (min p1 p2 p3 p4)
+                   (max p1 p2 p3 p4))))
+
+;(define (div-inteval x)
+;  (make-interval (/ 1.0 (upper-bound x))
+                                        ;                (/ 1.0 (lower-bound x))))
+
+(define (div-interval x)
+  (if (< (* (lower-bound x) (upper-bound x)) 0) (error "the bound may raise error") (make-interval (/ 1.0 (upper-bound x))
+                                                                                                   (/ 1.0 (lower-bound x)))))
+
+(define (make-interval a b)
+  (cons a b))
+
+
+(define (lower-bound x)
+  (car x))
+(define (upper-bound x)
+  (cdr x))
+(define (sub-interval x y)
+  (let ((p1 (- (lower-bound x) (lower-bound y)))
+        (p2 (- (upper-bound x) (upper-bound y))))
+    (make-interval (min p1 p2) (max p1 p2))))
+
+
+(define (max p1 p2)
+  (if (> p1 p2)
+      p1
+      p2))
+
+(define (length-interval x) (- (upper-bound x) (lower-bound x)))
+
+(define (div-interval x)
+  (if (< (* (lower-bound x) (upper-bound x)) 0)
+      (error "the bound may raise error")
+      (make-interval (/ 1.0 (upper-bound x)) (/ 1.0 (lower-bound x)))))
+
+
+
+(define (make-center-width c w)
+  (make-interval (- c w) (+ c w)))
+
+(define (center i)
+  (/ (+ (lower-bound i) (upper-bound i)) 2.0))
+
+(define (width i)
+  (/ (- (upper-bound i) (lower-bound i)) 2.0))
+
+
+(define (make-center-percent c p)
+  (make-interval (* (- 1 p) c) (* (+ 1 p) c)))
+
+(define (percent i)
+  (- 1 (/ (* (lower-bound i) 2.0) (+ (upper-bound i) (lower-bound i)))))
+
+
+(define (make-center-percent c w)
+  (lambda(x) (make-interval (- c (* w x)) (+ c (* w x)))))
+
+
+(define (length items)
+  (if (null? items)
+      0
+      (+ 1 (length (cdr items)))))
+
+(define (length items)
+  (define (length-iter a count)
+    (if (null? a)
+        count
+        (length-iter (cdr a) (+ 1 count))))
+  (length-iter items 0))
+(define (append list1 list2)
+  (if (null? list1)
+      list2
+      (cons (car list1) (append (cdr list1) list2))))
+
+(define (last-pair list1)
+  (if (null? (cdr list1))
+      (car list1)
+      (last-pair (cdr list1))))
+
+
+(define (reverse list1)
+  (if (null? (cdr list1))
+      (car list1)
+      (cons (reverse (cdr list1)) (car list1))))
+
+
+(define (reverse-iter items count)
+  (if (= count 0)
+      (car items)
+      (cons (list-ref items count) (reverse-iter items (- count 1)))))
+(define (length items)
+  (define (length-iter a count)
+    (if (null? a)
+        count
+        (length-iter (cdr a) (+ 1 count))))
+  (length-iter items 0))
+
+(define (reverse list1)
+  (define (reverse-iter items count)
+    (if (= count 0)
+        (car items)
+        (cons (list-ref items count) (reverse-iter items (- count 1)))))
+  (reverse-iter list1 (- (length list1) 1)))
+;利用函数本身的栈式操作
+(define (reverse-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons (car things) answer))))
+  (iter items ()))
+
+)
+
+
+(define (scale-list items factor)
+  (if (null? items)
+      ()
+      (cons (* (car items) factor)
+            (scale-list (cdr items) factor))))
+
+(define (scale-list items factor)
+  (if (null? items)
+      ()
+      (cons (* (car items) factor)
+            (scale-list (cdr items) factor))))
+
+
+(define (map proc items)
+  (if (null? items)
+      ()
+      (cons (proc (car items))
+            (map proc (cdr items)))))
+(define (map proc items)
+  (if (null? items)
+      ()
+      (cons (proc (car items)) (map proc (cdr items)))))
+
+
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons (square (car things)) answer))))
+  (iter items ()))
+
+(define (square x) (* x x))
+
+(define (square-list items)
+  (define (iter things answer)
+    (if (null? things)
+        answer
+        (iter (cdr things)
+              (cons answer (square (car things))))))
+(iter items ())))
+
+
+
+
+
+
+(define (count-level x)
+  (cond ((null? x) 0)
+        ((not (pair? x)) 1)
+        (else (+ (count-level (car x))
+                 (count-level (cdr x))))))
+
+
+(define (make-mobile left right)
+  (cons left right))
+
+(define (get-left tree)
+  (car tree))
+
+(define (get-right tree)
+  (cdr tree))
+
+
+
+(define (make-branch length structure)
+  (cons length structure))
+
+
+(define (get-branch tree)
+  (car tree))
+
+(define (get-structure tree)
+  (cdr tree))
+
+(define (scale-tree tree factor)
+  (cond ((null? tree) ())
+        ((not (pair? tree)) (* tree factor))
+        (else (cons (scale-tree (car tree) factor)
+                    (scale-tree (cdr tree) factor)))))
+
+
+(define (scale-tree tree factor)
+  (map (lambda (sub-tree)
+         (if (pair? sub-tree)
+             (scale-tree sub-tree factor)
+             (* sub-tree factor))) tree)
+  )
+
+
+
+
+(define (scale-tree tree)
+  map (lambda(sub-tree)
+        (if (pair? sub-tree)
+            (scale-tree sub-tree)
+            ((lambda(x) (* x x)) sub-tree))) tree))
+
+
+
+(define (square-list tree)
+(define (square x) (* x x))
+(cond ((null? tree) ())
+      ((not (pair? tree) (* tree tree)))
+      (else (cons (square (square-list tree))
+                  (square (square-list tree))))))
